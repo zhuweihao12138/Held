@@ -21,7 +21,7 @@ use crate::{
 use crate::utils::input::Input;
 
 use super::{
-    mode::mode::{Command, InputMode, Insert, LastLine, ModeType},
+    mode::mode::{Command, InputMode, Insert, LastLine, ModeType, Search},
     mode::normal::Normal,
     AppInfo,
 };
@@ -31,6 +31,7 @@ lazy_static! {
     static ref INSERT: Arc<Insert> = Arc::new(Insert);
     static ref LASTLINE: Arc<LastLine> = Arc::new(LastLine::new());
     static ref NORMAL: Arc<Normal> = Arc::new(Normal::new());
+    static ref SEARCH: Arc<Search> = Arc::new(Search::new());
     pub static ref APP_INFO: Mutex<AppInfo> = Mutex::new(AppInfo {
         level: InfoLevel::Info,
         info: String::new()
@@ -81,7 +82,7 @@ impl UiCore {
     pub fn update_bottom_state_bar(&mut self) -> io::Result<()> {
         let container = self.container.upgrade().unwrap();
         let mode = container.mode.read().unwrap().mode_type();
-        if mode == ModeType::LastLine {
+        if mode == ModeType::LastLine|| mode == ModeType::Search{
             return Ok(());
         }
 
@@ -352,14 +353,14 @@ impl Ui {
                 }
             }
 
-            if self.mode.read().unwrap().mode_type() != ModeType::LastLine {
+            if self.mode.read().unwrap().mode_type() != ModeType::LastLine||self.mode.read().unwrap().mode_type() != ModeType::Search {
                 core.update_bottom_state_bar()?;
             }
         }
     }
 
     fn set_mode(&self, mode: ModeType, ui: &mut MutexGuard<UiCore>) -> io::Result<()> {
-        if mode != ModeType::LastLine {
+        if mode != ModeType::LastLine|| mode != ModeType::Search {
             ui.cursor.set_prefix_mode(true);
 
             ui.render_content(0, CONTENT_WINSIZE.read().unwrap().rows as usize)?;
@@ -381,6 +382,19 @@ impl Ui {
             }
             ModeType::Insert => *self.mode.write().unwrap() = INSERT.clone(),
             ModeType::Normal => *self.mode.write().unwrap() = NORMAL.clone(),
+            ModeType::Search => {
+                ui.cursor.set_prefix_mode(false);
+                let search = SEARCH.clone();
+                search.reset();
+                *self.mode.write().unwrap() = search;
+
+                ui.cursor.move_to(0, u16::MAX - 1)?;
+                DEF_STYLE.read().unwrap().set_cmd_style()?;
+                // 写一个空行
+                ui.cursor.clear_current_line()?;
+                ui.cursor.move_to_columu(0)?;
+                ui.cursor.write('/')?;
+            }
         }
 
         Ok(())

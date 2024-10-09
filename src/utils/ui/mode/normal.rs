@@ -20,12 +20,15 @@
 
 // 参考：https://github.com/neovim/neovim/blob/master/src/nvim/normal.c#L89
 
+use crossterm::event::KeyEvent;
 use lazy_static::lazy_static;
 
+use crate::utils::buffer;
 use crate::utils::ui::event::KeyEventCallback;
 use crate::utils::ui::event::WarpUiCallBackType;
 use crate::utils::ui::uicore::UiCore;
 use crate::utils::ui::uicore::CONTENT_WINSIZE;
+use std::char;
 use std::io;
 use std::sync::{Mutex, MutexGuard};
 
@@ -156,6 +159,10 @@ impl KeyEventCallback for Normal {
             b"x" => {
                 normal_state.on_x_clicked();
             }
+            // b"/"=>{
+            //     normal_state.on_slash_clicked();
+            // }
+            
             _ => {}
         }
         return normal_state.handle(ui);
@@ -611,7 +618,47 @@ impl NormalState {
         }
         return Ok(WarpUiCallBackType::None);
     }
-}
+
+    // fn on_slash_clicked(&mut self){
+    //     if self.cmdchar.is_none(){
+    //         self.cmdchar = Some('\\')
+    //     }
+    //     }
+    // fn exec_slash_cmd(&mut self, ui: &mut MutexGuard<UiCore>)-> io::Result<WarpUiCallBackType>{
+    //     loop{
+    //         let ev = crossterm::event::read()?;
+    //         match ev{
+    //             crossterm::event::Event::Key(KeyEvent{code,
+    //                 modifiers,
+    //                 state,
+    //                 kind})=>{
+    //                     match code {
+    //                         crossterm::event::KeyCode::Char(c) => self.exec_search(ui, c as u8)?,
+    //                         crossterm::event::KeyCode::Enter=>todo!(),
+    //                         crossterm::event::KeyCode::Esc=>todo!(),
+    //                         _=>{return Ok(WarpUiCallBackType::None);
+    //                         }
+    //                     }
+    //                 },
+    //             _=>{}
+    //         }
+    //     }
+    // }
+    // fn exec_search(&mut self, ui: &mut MutexGuard<UiCore>, c: u8)-> io::Result<()>{
+    //     self.cmdbuf.push(c);
+    //     let search_text = &self.cmdbuf[..];
+    //     let buffer_line_count = ui.buffer.line_count();
+    //     for line_idx in 0..buffer_line_count {
+    //         let line = ui.buffer.get_line(line_idx as u16);
+    //         if let Some(pos)=line.find(search_text){
+    //             ui.cursor.move_to(pos as u16,line_idx as u16)?;
+    //             break;
+    //         }
+    //     }
+    //     return Ok(())
+    // }
+    }
+
 
 pub trait StateMachine {
     fn handle(&mut self, ui: &mut MutexGuard<UiCore>) -> io::Result<WarpUiCallBackType>;
@@ -640,6 +687,7 @@ impl StateMachine for NormalState {
             'f' => self.exec_f_cmd(ui),
             'F' => self.exec_F_cmd(ui),
             'x' => self.exec_x_cmd(ui),
+            // '/'=>self.exec_slash_cmd(ui),
             _ => return Ok(WarpUiCallBackType::None),
         }
     }

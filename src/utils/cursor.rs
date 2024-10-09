@@ -492,4 +492,35 @@ impl CursorCrtl {
 
         Ok(())
     }
+
+    pub fn highlight_partial(&mut self, line: u16, start: usize, end: usize) -> io::Result<()> {
+        // 清除上次高亮的部分（如果有）
+        if let Some((last_start, last_end)) = self.last_highlight {
+            // 清除上次高亮
+            self.clear_highlight(line, last_start, last_end)?;
+        }
+    
+        // 设置新的高亮
+        self.set_highlight(line, start, end)?;
+    
+        // 更新上次高亮的位置
+        self.last_highlight = Some((start, end));
+    
+        Ok(())
+    }
+    
+    fn clear_highlight(&mut self, line: u16, start: usize, end: usize) -> io::Result<()> {
+        // 设置背景色为默认
+        self.move_to(line, start)?;
+        self.write(" ".repeat(end - start).as_bytes())?;
+        Ok(())
+    }
+    
+    fn set_highlight(&mut self, line: u16, start: usize, end: usize) -> io::Result<()> {
+        // 设置高亮背景色
+        StyleManager::set_background_color(self.line_setting.highlight.color)?;
+        self.move_to(line, start)?;
+        self.write(" ".repeat(end - start).as_bytes())?;
+        Ok(())
+    }
 }

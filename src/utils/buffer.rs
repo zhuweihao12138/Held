@@ -63,6 +63,17 @@ impl LineBuffer {
     pub fn insert(&mut self, idx: usize, data: u8) {
         self.data.insert(idx, data)
     }
+    
+    pub fn find(&self, pattern: &String) -> Option<u16> {
+        let pattern_bytes = pattern.as_bytes();
+        for (idx, window) in self.data.windows(pattern.len()).enumerate() {
+            if window == pattern_bytes{
+                return Some(idx as u16);
+            }
+        }
+        
+        None
+    }
 }
 
 #[derive(Debug, Default)]

@@ -108,6 +108,7 @@ pub enum ModeType {
     LastLine,
     Insert,
     Normal,
+    Search,
 }
 
 impl InputMode for Command {
@@ -128,6 +129,12 @@ impl InputMode for Insert {
 impl InputMode for Normal {
     fn mode_type(&self) -> ModeType {
         ModeType::Normal
+    }
+}
+
+impl InputMode for Search {
+    fn mode_type(&self) -> ModeType {
+        ModeType::Search
     }
 }
 
@@ -580,6 +587,11 @@ impl KeyEventCallback for Command {
                 return Ok(WarpUiCallBackType::None);
             }
 
+            b"/" => {
+                ui.cursor.store_pos();
+                return Ok(WarpUiCallBackType::ChangMode(ModeType::Search));
+            }
+
             _ => {
                 return Ok(WarpUiCallBackType::None);
             }
@@ -774,5 +786,84 @@ impl KeyEventCallback for LastLine {
         ui.cursor.write(String::from_utf8_lossy(&data))?;
 
         Ok(WarpUiCallBackType::None)
+    }
+}
+
+#[derive(Debug)]
+pub struct Search{
+    buf: Mutex<Vec<u8>>,
+}
+
+impl Search {
+    pub fn new() -> Self {
+        Self {
+            buf: Mutex::new(vec![':' as u8]),
+        }
+    }
+
+    pub fn reset(&self) {
+        self.buf.lock().unwrap().resize(1, ':' as u8);
+    }
+}
+
+impl KeyEventCallback for Search {
+    fn enter(&self, ui: &mut MutexGuard<UiCore>) -> io::Result<WarpUiCallBackType> {
+        let mut buf = self.buf.lock().unwrap();
+        let cmd = String::from_utf8_lossy(&buf).to_string();
+
+        let ret = LastLineCommand::process(ui, cmd);
+
+        ui.cursor.move_to(1, u16::MAX - 1)?;
+        // ui.cursor.move_to_columu(1)?;
+        TermManager::clear_until_new_line()?;
+        ui.cursor.move_to(1, u16::MAX - 1)?;
+
+        buf.resize(1, 0);
+        if ret == WarpUiCallBackType::None {
+            ui.cursor.restore_pos()?;
+            return Ok(WarpUiCallBackType::ChangMode(ModeType::Command));
+        }
+
+        Ok(ret)
+    }
+
+    fn esc(&self, ui: &mut MutexGuard<UiCore>) -> io::Result<WarpUiCallBackType> {
+        ui.cursor.restore_pos()?;
+        Ok(WarpUiCallBackType::ChangMode(ModeType::Command))
+    }
+
+    fn tab(&self, ui: &mut MutexGuard<UiCore>) -> io::Result<WarpUiCallBackType> {
+        Ok(WarpUiCallBackType::None)
+    }
+
+    fn input_data(
+            &self,
+            ui: &mut MutexGuard<UiCore>,
+            data: &[u8],
+        ) -> io::Result<WarpUiCallBackType> {
+            let mut buf = self.buf.lock().unwrap();
+
+            if ui.cursor.x() == buf.len() as u16 {
+                buf.extend(data);
+            } else {
+                let index = ui.cursor.x() as usize;
+                for (i, &item) in data.iter().enumerate() {
+                    buf.insert(index + i, item);
+                }
+            }
+        ui.cursor.write(String::from_utf8_lossy(&data))?;
+
+        let buf = self.buf.lock().unwrap();
+        let search_text = String::from_utf8_lossy(&buf).to_string();
+        let buffer_line_count = ui.buffer.line_count();
+        for line_idx in 0..buffer_line_count {
+            let line = ui.buffer.get_line(line_idx as u16);
+            if let Some(pos)=line.find(&search_text){
+                ui.cursor.move_to(pos as u16,line_idx as u16)?;
+                break;
+            }
+        }
+        
+            Ok(WarpUiCallBackType::None)
     }
 }
